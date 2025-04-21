@@ -1,0 +1,67 @@
+Option Explicit
+
+Dim statusForm As frmStatus
+
+Public Sub KopiereOrdnerstruktur()
+    Dim olNS As Outlook.NameSpace
+    Dim QuellOrdner As Outlook.MAPIFolder
+    Dim ZielOrdner As Outlook.MAPIFolder
+
+    Set olNS = Application.GetNamespace("MAPI")
+
+    ' Quellordner auswählen
+    Set QuellOrdner = olNS.PickFolder
+    If QuellOrdner Is Nothing Then
+        MsgBox "Quellordner nicht ausgewählt", vbExclamation
+        Exit Sub
+    End If
+
+    ' Zielordner auswählen
+    Set ZielOrdner = olNS.PickFolder
+    If ZielOrdner Is Nothing Then
+        MsgBox "Zielordner nicht ausgewählt", vbExclamation
+        Exit Sub
+    End If
+
+    ' Status-Form anzeigen
+    Set statusForm = New frmStatus
+    statusForm.lblStatus.Caption = "Kopiere Ordnerstruktur..."
+    statusForm.Show vbModeless
+
+    ' Starte die rekursive Kopie
+    KopiereOrdnerUndElemente QuellOrdner, ZielOrdner
+
+    statusForm.lblStatus.Caption = "Fertig!"
+    MsgBox "Kopieren abgeschlossen!", vbInformation
+    Unload statusForm
+End Sub
+
+Private Sub KopiereOrdnerUndElemente(ByVal Quelle As Outlook.MAPIFolder, ByVal Ziel As Outlook.MAPIFolder)
+    Dim Unterordner As Outlook.MAPIFolder
+    Dim NeuerOrdner As Outlook.MAPIFolder
+    Dim Item As Object
+    Dim i As Long
+
+    ' Neuen Unterordner im Ziel erstellen
+    On Error Resume Next
+    Set NeuerOrdner = Ziel.Folders(Quelle.Name)
+    If NeuerOrdner Is Nothing Then
+        Set NeuerOrdner = Ziel.Folders.Add(Quelle.Name, Quelle.DefaultItemType)
+    End If
+    On Error GoTo 0
+
+    ' Status aktualisieren
+    statusForm.lblStatus.Caption = "Kopiere: " & Quelle.FolderPath
+    DoEvents
+
+    ' Elemente kopieren
+    For i = 1 To Quelle.Items.Count
+        Set Item = Quelle.Items(i)
+        Item.Copy.Move NeuerOrdner
+    Next i
+
+    ' Rekursiv durch Unterordner
+    For Each Unterordner In Quelle.Folders
+        KopiereOrdnerUndElemente Unterordner, NeuerOrdner
+    Next Unterordner
+End Sub
